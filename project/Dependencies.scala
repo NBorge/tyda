@@ -15,6 +15,7 @@ object Dependencies {
     val commonsIo = CompileDeps.commonsIo % Test
     val spark3Sql = (CompileDeps.spark3Sql % Test).exclude("org.scala-lang.modules", "scala-xml_2.13")
     val spark4Sql = (CompileDeps.spark4Sql % Test).exclude("org.scala-lang.modules", "scala-xml_2.13")
+    val spark3Hive = (CompileDeps.spark3Hive % Test).exclude("org.scala-lang.modules", "scala-xml_2.13")
     val gcsConnector = CompileDeps.gcsConnector % Test
     val jsonSchemaValidator = "com.networknt" % "json-schema-validator" % "3.0.1" % Test
     val bigQuerySpark3Connector = "com.google.cloud.spark" % "spark-3.5-bigquery" % bigQueryConnectorVersion %
@@ -34,6 +35,7 @@ object Dependencies {
     val hadoop = "org.apache.hadoop" % "hadoop-client-runtime" % "3.3.4"
     val spark3Sql = ("org.apache.spark" %% "spark-sql" % spark3Version).cross(CrossVersion.for3Use2_13)
     val spark4Sql = ("org.apache.spark" %% "spark-sql" % spark4Version).cross(CrossVersion.for3Use2_13)
+    val spark3Hive = ("org.apache.spark" %% "spark-hive" % spark3Version).cross(CrossVersion.for3Use2_13)
     val scalameta = "org.scalameta" %% "scalameta" % "4.15.2"
     val gcsConnector = ("com.google.cloud.bigdataoss" % "gcs-connector" % "hadoop3-2.2.31")
   }
@@ -45,6 +47,9 @@ object Dependencies {
     val spark4Sql = ("org.apache.spark" %% "spark-sql" % spark4Version % Provided).cross(
       CrossVersion.for3Use2_13
     )
+    val spark3Hive = ("org.apache.spark" %% "spark-hive" % spark3Version % Provided)
+      .cross(CrossVersion.for3Use2_13)
+      .exclude("org.scala-lang.modules", "scala-xml_2.13")
     val jsoniterMacros = "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" %
       jsoniterVersion % Provided
   }
@@ -83,9 +88,9 @@ object Dependencies {
   val tydaMetadata = libraryDependencies ++=
     Seq(CompileDeps.jsoniterCore, CompileDeps.scalameta, ProvidedDeps.jsoniterMacros, TestDeps.scalatest)
 
-  val tydaSql = libraryDependencies ++= Seq(CompileDeps.slf4j)
+  val tydaSql = libraryDependencies ++= Seq(CompileDeps.slf4j, ProvidedDeps.spark3Hive)
 
-  val tydaSparkSql = libraryDependencies ++= Seq(TestDeps.spark3Sql)
+  val tydaSparkSql = libraryDependencies ++= Seq(TestDeps.spark3Sql, TestDeps.spark3Hive)
 
   val tydaBigQuery = libraryDependencies ++=
     Seq(CompileDeps.bigQuery, TestDeps.scalatest, TestDeps.gcsConnector)

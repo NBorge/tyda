@@ -3,7 +3,6 @@ package com.choreograph.tyda.sql
 import com.choreograph.tyda.Format
 import com.choreograph.tyda.rewrite.ActionRule
 import com.choreograph.tyda.rewrite.CheckArrayIndexPositive
-import com.choreograph.tyda.rewrite.CheckFloatingOverflow
 import com.choreograph.tyda.rewrite.CheckMapKeysDistinct
 import com.choreograph.tyda.rewrite.DatasetRule
 import com.choreograph.tyda.rewrite.DisfavorIsNotDistinctFrom
@@ -44,6 +43,7 @@ final case class SqlDialect(
     extractTimestampMicros: String,
     floatingAggregate: SqlDialect.FloatingAggregate,
     floatingCompare: SqlDialect.FloatingCompare,
+    floatingOverflowFunctions: SqlDialect.FloatingOverflowFunctions,
     fromJson: SqlDialect.FromJsonSupport,
     floatingOrder: SqlDialect.FloatingOrder,
     intergerSupport: SqlDialect.IntegerSupport,
@@ -86,6 +86,12 @@ final case class SqlDialect(
 )
 
 object SqlDialect {
+
+  enum FloatingOverflowFunctions {
+    case Disabled
+    case BigQuery
+    case Spark
+  }
 
   enum ExpressionBinding {
     case WithExpression
@@ -455,6 +461,7 @@ object SqlDialect {
     extractTimestampMicros = "unix_micros",
     floatingAggregate = FloatingAggregate.NaNIsSmallestAndLargest,
     floatingCompare = FloatingCompare.Ieee,
+    floatingOverflowFunctions = FloatingOverflowFunctions.BigQuery,
     fromJson = FromJsonSupport.Extractors(
       extractScalar = "json_value",
       extractArray = "json_query_array",
@@ -484,7 +491,6 @@ object SqlDialect {
     rand = "RAND",
     writeSupport = WriteSupport.ExportData,
     correctnessRules = Seq(
-      CheckFloatingOverflow.FloatOnly,
       CheckMapKeysDistinct,
       DistributeProductAndSeqEquals,
       DisfavorIsNotDistinctFrom,
@@ -520,6 +526,7 @@ object SqlDialect {
     extractTimestampMicros = "unix_micros",
     floatingAggregate = FloatingAggregate.NaNIsLargest,
     floatingCompare = FloatingCompare.NaNIsLargest,
+    floatingOverflowFunctions = FloatingOverflowFunctions.Spark,
     fromJson = FromJsonSupport.Parser("from_json", Map("mode" -> "PERMISSIVE") ++ sparkJsonOptions),
     floatingOrder = FloatingOrder.NaNLast,
     intergerSupport = IntegerSupport.AllSizes,
@@ -549,7 +556,6 @@ object SqlDialect {
     writeSupport =
       WriteSupport.CreateTable(Map(Format.Json -> (Map("mode" -> "FAILFAST") ++ sparkJsonOptions))),
     correctnessRules = Seq(
-      CheckFloatingOverflow.FloatAndDouble,
       CheckArrayIndexPositive,
       WrapOptionInCollect,
       SparkJsonCompatability.AdaptReads,

@@ -1,5 +1,9 @@
 package com.choreograph.tyda.sparksql
 
+import java.nio.file.Files
+
+import scala.annotation.tailrec
+
 import org.apache.spark.sql.SparkSession
 import org.scalatest.Assertions.fail
 import org.scalatest.Assertions.pending
@@ -25,6 +29,15 @@ import com.choreograph.tyda.testsuites.DatasetSuite
 import com.choreograph.tyda.testsuites.ExprEvaluationSuite
 import com.choreograph.tyda.unreachable
 
+private object SparkSqlTestHive {
+  private val directory = Files.createTempDirectory("tyda-spark-sql-hive-")
+
+  System.setProperty("derby.stream.error.file", directory.resolve("derby.log").toString)
+
+  val metastoreUrl: String = s"jdbc:derby:${directory.resolve("metastore_db")};create=true"
+  val warehouseDirectory: String = directory.resolve("warehouse").toUri.toString
+}
+
 trait SharedSparkSession {
   lazy given spark: SparkSession =
     SparkSession
@@ -38,9 +51,12 @@ trait SharedSparkSession {
       .config("spark.sql.parquet.datetimeRebaseModeInRead", "CORRECTED")
       .config("spark.sql.legacy.timeParserPolicy", "CORRECTED")
       .config("spark.sql.ansi.enabled", "true")
+      .config("javax.jdo.option.ConnectionURL", SparkSqlTestHive.metastoreUrl)
+      .config("spark.sql.warehouse.dir", SparkSqlTestHive.warehouseDirectory)
       /* By default Spark does variable substitution before parsing, this have obvious problems if the sql
        * contains any user controllable value. */
       .config("spark.sql.variable.substitute", "false")
+      .enableHiveSupport()
       .getOrCreate()
 }
 
@@ -67,10 +83,20 @@ class SparkSqlRunner(using spark: SparkSession) extends Runner {
   def explain(action: Dataset.Action): String = sql(action).single
 
   private def withAnsiMode[T](f: => T)(using spark: SparkSession): T = {
+    @tailrec
+    def rootCause(error: Throwable): Throwable =
+      error.getCause match {
+        case null => error
+        case cause => rootCause(cause)
+      }
+
     val oldSetting = spark.conf.getOption("spark.sql.ansi.enabled")
     try {
       spark.conf.set("spark.sql.ansi.enabled", value = true)
       f
+    } catch {
+      case error: Exception if Option(error.getMessage).exists(_.startsWith("[FAILED_EXECUTE_UDF]")) =>
+        throw rootCause(error)
     } finally oldSetting.foreach(mode => spark.conf.set("spark.sql.ansi.enabled", mode))
   }
 }

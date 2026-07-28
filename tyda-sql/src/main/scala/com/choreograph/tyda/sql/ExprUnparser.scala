@@ -157,6 +157,21 @@ private def exprToSqlExpr[T](fullExpr: ExprNode[T], args: UnparserArgs): Result[
     def binaryOp(op: String, lhs: ExprNode[?], rhs: ExprNode[?]): Result[SqlExpr] =
       inner(lhs).flatMap(l => inner(rhs).map(r => SqlExpr.BinaryOp(op, l, r)))
 
+    def floatingOperation(
+        operation: FloatingOperation,
+        lhs: ExprNode[?],
+        rhs: ExprNode[?]
+    ): Option[Result[SqlExpr]] =
+      FloatingType
+        .from(expr.codec)
+        .flatMap(args.floatingOverflowFunctions.register(dialect, operation, _))
+        .map(name =>
+          for {
+            lhsSql <- inner(lhs)
+            rhsSql <- inner(rhs)
+          } yield SqlExpr.Function(name, Seq(lhsSql, rhsSql))
+        )
+
     def getTableExpr(ref: ExprNode.Reference[?]): IdentifierOrSqlExpr =
       args.references.get(ref).getOrElse(Errors.failUnexpectedReference(ref, args.references.keys))
 
@@ -500,17 +515,23 @@ private def exprToSqlExpr[T](fullExpr: ExprNode[T], args: UnparserArgs): Result[
         }
         element.map(unwrapArrayElement(_, array.codec.element, dialect))
       case ExprNode.Abs(_, operand) => inner(operand).map(e => SqlExpr.Function("abs", Seq(e)))
-      case ExprNode.Add(_, lhs, rhs) => binaryOp("+", lhs, rhs)
-      case ExprNode.Subtract(_, lhs, rhs) => binaryOp("-", lhs, rhs)
-      case ExprNode.Multiply(_, lhs, rhs) => binaryOp("*", lhs, rhs)
+      case ExprNode.Add(_, lhs, rhs) =>
+        floatingOperation(FloatingOperation.Add, lhs, rhs).getOrElse(binaryOp("+", lhs, rhs))
+      case ExprNode.Subtract(_, lhs, rhs) => floatingOperation(FloatingOperation.Subtract, lhs, rhs)
+          .getOrElse(binaryOp("-", lhs, rhs))
+      case ExprNode.Multiply(_, lhs, rhs) => floatingOperation(FloatingOperation.Multiply, lhs, rhs)
+          .getOrElse(binaryOp("*", lhs, rhs))
       case ExprNode.Quotient(_: Num.Integral[?], lhs, rhs) => for {
           lhs <- inner(lhs)
           rhs <- inner(rhs)
         } yield cast(SqlExpr.Function("div", Seq(lhs, rhs)), expr.codec, dialect)
-      case ExprNode.Quotient(_, lhs, rhs) => for {
-          lhs <- inner(lhs)
-          rhs <- inner(rhs)
-        } yield cast(SqlExpr.BinaryOp("/", lhs, rhs), expr.codec, dialect)
+      case ExprNode.Quotient(_, lhs, rhs) => floatingOperation(FloatingOperation.Quotient, lhs, rhs)
+          .getOrElse(
+            for {
+              lhs <- inner(lhs)
+              rhs <- inner(rhs)
+            } yield cast(SqlExpr.BinaryOp("/", lhs, rhs), expr.codec, dialect)
+          )
       case ExprNode.Negate(_, operand) => inner(operand).map(e => SqlExpr.UnaryOp("-", e, isPrefix = true))
       case ExprNode.Cast(value, _) => inner(value).map(cast(_, expr.codec, dialect))
       case ExprNode.TryCast(value, canTryCast) =>

@@ -111,11 +111,19 @@ SELECT (t1._1 + t1._2) AS value FROM t1
 ------ end
 
 ------ Test: add two double numbers
-SELECT element_at(transform(array(t1._1), c0 -> element_at(transform(array(t1._2), c1 -> element_at(transform(array((c0 + c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS DOUBLE))) AND (NOT (abs(c1) = CAST('Infinity' AS DOUBLE)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(1.7976931348623157E308 AS DOUBLE)))) THEN CAST(raise_error('Double overflow') AS DOUBLE) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_double_add AS 'com.choreograph.tyda.sql.spark.overflow.CheckedDoubleAdd';
+
+SELECT tyda_double_add(t1._1, t1._2) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_double_add
 ------ end
 
 ------ Test: add two float numbers
-SELECT element_at(transform(array(t1._1), c0 -> element_at(transform(array(t1._2), c1 -> element_at(transform(array((c0 + c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_add AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatAdd';
+
+SELECT tyda_float_add(t1._1, t1._2) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_add
 ------ end
 
 ------ Test: add two int numbers
@@ -131,15 +139,27 @@ SELECT (t1._1 + t1._2) AS value FROM t1
 ------ end
 
 ------ Test: add zero to optional float
-SELECT CASE WHEN (t1.value IS NOT NULL) THEN element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(0.0 AS FLOAT)), c1 -> element_at(transform(array((c0 + c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) END AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_add AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatAdd';
+
+SELECT CASE WHEN (t1.value IS NOT NULL) THEN tyda_float_add(t1.value, CAST(0.0 AS FLOAT)) END AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_add
 ------ end
 
 ------ Test: add zero to special double values
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(0.0 AS DOUBLE)), c1 -> element_at(transform(array((c0 + c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS DOUBLE))) AND (NOT (abs(c1) = CAST('Infinity' AS DOUBLE)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(1.7976931348623157E308 AS DOUBLE)))) THEN CAST(raise_error('Double overflow') AS DOUBLE) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_double_add AS 'com.choreograph.tyda.sql.spark.overflow.CheckedDoubleAdd';
+
+SELECT tyda_double_add(t1.value, CAST(0.0 AS DOUBLE)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_double_add
 ------ end
 
 ------ Test: add zero to special float values
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(0.0 AS FLOAT)), c1 -> element_at(transform(array((c0 + c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_add AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatAdd';
+
+SELECT tyda_float_add(t1.value, CAST(0.0 AS FLOAT)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_add
 ------ end
 
 ------ Test: apply to case class and auto tupling
@@ -715,11 +735,19 @@ SELECT array_distinct(t1.value) AS value FROM t1
 ------ end
 
 ------ Test: divide two double numbers
-SELECT element_at(transform(array(t1._1), c0 -> element_at(transform(array(t1._2), c1 -> element_at(transform(array(CAST((c0 / c1) AS DOUBLE)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS DOUBLE))) AND (NOT (abs(c1) = CAST('Infinity' AS DOUBLE)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(1.7976931348623157E308 AS DOUBLE)))) THEN CAST(raise_error('Double overflow') AS DOUBLE) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_double_divide AS 'com.choreograph.tyda.sql.spark.overflow.CheckedDoubleQuotient';
+
+SELECT tyda_double_divide(t1._1, t1._2) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_double_divide
 ------ end
 
 ------ Test: divide two float numbers
-SELECT element_at(transform(array(t1._1), c0 -> element_at(transform(array(t1._2), c1 -> element_at(transform(array(CAST((c0 / c1) AS FLOAT)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_divide AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatQuotient';
+
+SELECT tyda_float_divide(t1._1, t1._2) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_divide
 ------ end
 
 ------ Test: endsWith string
@@ -795,43 +823,83 @@ SELECT (t1.value - CAST(127 AS TINYINT)) AS value FROM t1
 ------ end
 
 ------ Test: fail on double addition overflow
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(1.7976931348623157E308 AS DOUBLE)), c1 -> element_at(transform(array((c0 + c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS DOUBLE))) AND (NOT (abs(c1) = CAST('Infinity' AS DOUBLE)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(1.7976931348623157E308 AS DOUBLE)))) THEN CAST(raise_error('Double overflow') AS DOUBLE) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_double_add AS 'com.choreograph.tyda.sql.spark.overflow.CheckedDoubleAdd';
+
+SELECT tyda_double_add(t1.value, CAST(1.7976931348623157E308 AS DOUBLE)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_double_add
 ------ end
 
 ------ Test: fail on double division by zero
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(0.0 AS DOUBLE)), c1 -> element_at(transform(array(CAST((c0 / c1) AS DOUBLE)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS DOUBLE))) AND (NOT (abs(c1) = CAST('Infinity' AS DOUBLE)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(1.7976931348623157E308 AS DOUBLE)))) THEN CAST(raise_error('Double overflow') AS DOUBLE) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_double_divide AS 'com.choreograph.tyda.sql.spark.overflow.CheckedDoubleQuotient';
+
+SELECT tyda_double_divide(t1.value, CAST(0.0 AS DOUBLE)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_double_divide
 ------ end
 
 ------ Test: fail on double division overflow
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(0.1 AS DOUBLE)), c1 -> element_at(transform(array(CAST((c0 / c1) AS DOUBLE)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS DOUBLE))) AND (NOT (abs(c1) = CAST('Infinity' AS DOUBLE)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(1.7976931348623157E308 AS DOUBLE)))) THEN CAST(raise_error('Double overflow') AS DOUBLE) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_double_divide AS 'com.choreograph.tyda.sql.spark.overflow.CheckedDoubleQuotient';
+
+SELECT tyda_double_divide(t1.value, CAST(0.1 AS DOUBLE)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_double_divide
 ------ end
 
 ------ Test: fail on double multiplication overflow
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(1.7976931348623157E308 AS DOUBLE)), c1 -> element_at(transform(array((c0 * c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS DOUBLE))) AND (NOT (abs(c1) = CAST('Infinity' AS DOUBLE)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(1.7976931348623157E308 AS DOUBLE)))) THEN CAST(raise_error('Double overflow') AS DOUBLE) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_double_multiply AS 'com.choreograph.tyda.sql.spark.overflow.CheckedDoubleMultiply';
+
+SELECT tyda_double_multiply(t1.value, CAST(1.7976931348623157E308 AS DOUBLE)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_double_multiply
 ------ end
 
 ------ Test: fail on double subtraction overflow
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(-1.7976931348623157E308 AS DOUBLE)), c1 -> element_at(transform(array((c0 - c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS DOUBLE))) AND (NOT (abs(c1) = CAST('Infinity' AS DOUBLE)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(1.7976931348623157E308 AS DOUBLE)))) THEN CAST(raise_error('Double overflow') AS DOUBLE) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_double_subtract AS 'com.choreograph.tyda.sql.spark.overflow.CheckedDoubleSubtract';
+
+SELECT tyda_double_subtract(t1.value, CAST(-1.7976931348623157E308 AS DOUBLE)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_double_subtract
 ------ end
 
 ------ Test: fail on float addition overflow
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(3.4028234663852886E38 AS FLOAT)), c1 -> element_at(transform(array((c0 + c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_add AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatAdd';
+
+SELECT tyda_float_add(t1.value, CAST(3.4028234663852886E38 AS FLOAT)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_add
 ------ end
 
 ------ Test: fail on float division by zero
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(0.0 AS FLOAT)), c1 -> element_at(transform(array(CAST((c0 / c1) AS FLOAT)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_divide AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatQuotient';
+
+SELECT tyda_float_divide(t1.value, CAST(0.0 AS FLOAT)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_divide
 ------ end
 
 ------ Test: fail on float division overflow
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(0.10000000149011612 AS FLOAT)), c1 -> element_at(transform(array(CAST((c0 / c1) AS FLOAT)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_divide AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatQuotient';
+
+SELECT tyda_float_divide(t1.value, CAST(0.10000000149011612 AS FLOAT)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_divide
 ------ end
 
 ------ Test: fail on float multiplication overflow
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(3.4028234663852886E38 AS FLOAT)), c1 -> element_at(transform(array((c0 * c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_multiply AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatMultiply';
+
+SELECT tyda_float_multiply(t1.value, CAST(3.4028234663852886E38 AS FLOAT)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_multiply
 ------ end
 
 ------ Test: fail on float subtraction overflow
-SELECT element_at(transform(array(t1.value), c0 -> element_at(transform(array(CAST(-3.4028234663852886E38 AS FLOAT)), c1 -> element_at(transform(array((c0 - c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_subtract AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatSubtract';
+
+SELECT tyda_float_subtract(t1.value, CAST(-3.4028234663852886E38 AS FLOAT)) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_subtract
 ------ end
 
 ------ Test: fail on int absolute value overflow
@@ -1275,11 +1343,19 @@ SELECT (t1._1 * t1._2) AS value FROM t1
 ------ end
 
 ------ Test: multiply two double numbers
-SELECT element_at(transform(array(t1._1), c0 -> element_at(transform(array(t1._2), c1 -> element_at(transform(array((c0 * c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS DOUBLE))) AND (NOT (abs(c1) = CAST('Infinity' AS DOUBLE)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(1.7976931348623157E308 AS DOUBLE)))) THEN CAST(raise_error('Double overflow') AS DOUBLE) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_double_multiply AS 'com.choreograph.tyda.sql.spark.overflow.CheckedDoubleMultiply';
+
+SELECT tyda_double_multiply(t1._1, t1._2) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_double_multiply
 ------ end
 
 ------ Test: multiply two float numbers
-SELECT element_at(transform(array(t1._1), c0 -> element_at(transform(array(t1._2), c1 -> element_at(transform(array((c0 * c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_multiply AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatMultiply';
+
+SELECT tyda_float_multiply(t1._1, t1._2) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_multiply
 ------ end
 
 ------ Test: multiply two int numbers
@@ -1347,7 +1423,15 @@ SELECT CASE WHEN (t1.value IS NOT NULL) THEN (t1.value.value IS NULL) END AS val
 ------ end
 
 ------ Test: nested float overflow checks
-SELECT element_at(transform(array(element_at(transform(array(t1._1), c0 -> element_at(transform(array(element_at(transform(array(t1._2), c1 -> element_at(transform(array(t1._2), c2 -> element_at(transform(array((c1 * c2)), c3 -> CASE WHEN ((((NOT (abs(c1) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c2) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c3))) AND (NOT (abs(c3) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c3 END), 1)), 1)), 1)), c4 -> element_at(transform(array((c0 - c4)), c5 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c4) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c5))) AND (NOT (abs(c5) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c5 END), 1)), 1)), 1)), c6 -> element_at(transform(array(t1._1), c7 -> element_at(transform(array((c6 - c7)), c8 -> CASE WHEN ((((NOT (abs(c6) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c7) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c8))) AND (NOT (abs(c8) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c8 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_subtract AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatSubtract';
+
+CREATE TEMPORARY FUNCTION tyda_float_multiply AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatMultiply';
+
+SELECT tyda_float_subtract(tyda_float_subtract(t1._1, tyda_float_multiply(t1._2, t1._2)), t1._1) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_subtract;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_multiply
 ------ end
 
 ------ Test: nested seq inside option map
@@ -1563,11 +1647,19 @@ SELECT (t1._1 - t1._2) AS value FROM t1
 ------ end
 
 ------ Test: subtract two double numbers
-SELECT element_at(transform(array(t1._1), c0 -> element_at(transform(array(t1._2), c1 -> element_at(transform(array((c0 - c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS DOUBLE))) AND (NOT (abs(c1) = CAST('Infinity' AS DOUBLE)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(1.7976931348623157E308 AS DOUBLE)))) THEN CAST(raise_error('Double overflow') AS DOUBLE) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_double_subtract AS 'com.choreograph.tyda.sql.spark.overflow.CheckedDoubleSubtract';
+
+SELECT tyda_double_subtract(t1._1, t1._2) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_double_subtract
 ------ end
 
 ------ Test: subtract two float numbers
-SELECT element_at(transform(array(t1._1), c0 -> element_at(transform(array(t1._2), c1 -> element_at(transform(array((c0 - c1)), c2 -> CASE WHEN ((((NOT (abs(c0) = CAST('Infinity' AS FLOAT))) AND (NOT (abs(c1) = CAST('Infinity' AS FLOAT)))) AND (NOT isnan(c2))) AND (NOT (abs(c2) <= CAST(3.4028234663852886E38 AS FLOAT)))) THEN CAST(raise_error('Float overflow') AS FLOAT) ELSE c2 END), 1)), 1)), 1) AS value FROM t1
+CREATE TEMPORARY FUNCTION tyda_float_subtract AS 'com.choreograph.tyda.sql.spark.overflow.CheckedFloatSubtract';
+
+SELECT tyda_float_subtract(t1._1, t1._2) AS value FROM t1;
+
+DROP TEMPORARY FUNCTION IF EXISTS tyda_float_subtract
 ------ end
 
 ------ Test: subtract two int numbers

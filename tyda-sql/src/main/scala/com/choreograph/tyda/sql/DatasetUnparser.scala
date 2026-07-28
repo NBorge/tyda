@@ -51,10 +51,9 @@ def toSql[T](ds: Dataset[T] | Dataset.Action, dialect: SqlDialect): Result[Rende
   }
 
 def toSql[T](ds: Dataset[T], dialect: SqlDialect): Result[RenderedMultiStatement] = {
+  val args = UnparserArgs(dialect, AliasGenerator.Default())
   val transformedDs = dialect.correctnessRules.transform(ds)
-  unparseDs(transformedDs, UnparserArgs(dialect, AliasGenerator.Default()))
-    .flatMap(_.build())
-    .map(queryToString)
+  unparseDs(transformedDs, args).flatMap(_.build()).map(queryToString(_, args))
 }
 
 def toSql(action: Dataset.Action, dialect: SqlDialect): Result[RenderedMultiStatement] = {
@@ -82,7 +81,7 @@ def toSql(action: Dataset.Action, dialect: SqlDialect): Result[RenderedMultiStat
               )
           }
         }
-        .map(queryToString)
+        .map(queryToString(_, args))
   }
 }
 
@@ -103,10 +102,14 @@ private def hasInnerStructColumns(codec: Codec[?]): Boolean = {
   }
 }
 
-private def queryToString(query: Query): RenderedMultiStatement = {
+private def queryToString(query: Query, args: UnparserArgs): RenderedMultiStatement = {
   val stringWriter = new StringWriter()
   SqlWriter(stringWriter).write(query)
-  RenderedMultiStatement(Seq.empty, stringWriter.toString, Seq.empty)
+  RenderedMultiStatement(
+    args.floatingOverflowFunctions.setup(args.dialect),
+    stringWriter.toString,
+    args.floatingOverflowFunctions.teardown(args.dialect)
+  )
 }
 
 private def unparseDs[T](ds: Dataset[T], args: UnparserArgs): Result[SelectBuilder[?, T]] = {
