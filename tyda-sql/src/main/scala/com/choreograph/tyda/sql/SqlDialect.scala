@@ -49,6 +49,7 @@ final case class SqlDialect(
     intergerSupport: SqlDialect.IntegerSupport,
     isNanFunction: String,
     makeArray: SqlDialect.MakeArray,
+    expressionBinding: SqlDialect.ExpressionBinding,
     makeDate: SqlDialect.MakeDate,
     makeDuration: SqlDialect.MakeDuration,
     makeStruct: SqlDialect.MakeStruct,
@@ -85,6 +86,11 @@ final case class SqlDialect(
 )
 
 object SqlDialect {
+
+  enum ExpressionBinding {
+    case WithExpression
+    case ArrayTransform(makeArray: String, transform: String, elementAt: String)
+  }
 
   /** How to decode a Base64 string to binary, returning null on invalid input.
     */
@@ -458,6 +464,7 @@ object SqlDialect {
     intergerSupport = IntegerSupport.OnlyBigInt,
     isNanFunction = "is_nan",
     makeArray = MakeArray.Brackets,
+    expressionBinding = ExpressionBinding.WithExpression,
     makeDate = MakeDate.Function("date_from_unix_date"),
     makeDuration = MakeDuration.DiffBigInt,
     makeStruct = MakeStruct.FunctionAndAlias("struct"),
@@ -518,6 +525,7 @@ object SqlDialect {
     intergerSupport = IntegerSupport.AllSizes,
     isNanFunction = "isnan",
     makeArray = MakeArray.Function("array"),
+    expressionBinding = ExpressionBinding.ArrayTransform("array", "transform", "element_at"),
     makeDate = MakeDate.Function("date_from_unix_date"),
     makeDuration = MakeDuration.DiffBigInt,
     makeStruct = MakeStruct.Function("named_struct"),

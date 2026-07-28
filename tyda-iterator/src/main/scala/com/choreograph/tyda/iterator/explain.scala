@@ -172,6 +172,12 @@ private def explainLambdaBody[T](expr: ExprNode[T], args: Map[ExprNode.Reference
           .map(branch => s"when ${body(branch.whenExpr)} then ${body(branch.thenExpr)}")
           .mkString(" ")
         s"(case $whenThenStr else ${body(elseExpr)})"
+      case ExprNode.Let(value, reference, letBody) =>
+        val referenceName = s"x${args.size}"
+        s"let $referenceName = ${body(value)} in ${explainLambdaBody(
+            letBody,
+            args + (reference -> referenceName)
+          )}"
       case ExprNode.StartsWith(string, prefix) => s"${body(string)}.startsWith(${body(prefix)})"
       case ExprNode.Trim(string) => s"${body(string)}.trim()"
       case ExprNode.EndsWith(string, suffix) => s"${body(string)}.endsWith(${body(suffix)})"

@@ -353,6 +353,19 @@ private object ExprNode extends ExprApi[ExprNode] {
       Cases(WhenThen(condition, ifTrue), Seq.empty, ifFalse)
   }
 
+  /** Evaluates `value` once and makes it available as `reference` in `body`.
+    *
+    * This is an internal node used by correctness rewrites that need to reuse
+    * an intermediate expression without duplicating it in generated SQL.
+    */
+  private[tyda] final case class Let[T, U](
+      value: ExprNode[T],
+      reference: ExprNode.Reference[T],
+      body: ExprNode[U]
+  ) extends ExprNode[U] {
+    override def codec: Codec[U] = body.codec
+  }
+
   /* Internal expr used to turn a `Option[T]` into a `T` when we know it's not None.
    *
    * This is used in GroupedDataset.fullOuterJoin where the `coalesce(l.key, r.key)` must not be null, but

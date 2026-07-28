@@ -1266,6 +1266,15 @@ trait ExprEvaluationSuiteBase extends AnyFunSuite {
   }
 
   {
+    given Arbitrary[Float] = Arbitrary.between(-1000, 1000).map(_.toFloat)
+    testHasSameBehavior[(Float, Float), Float](
+      "nested float overflow checks",
+      t => t._1 - t._2 * t._2 - t._1,
+      (lhs, rhs) => lhs - rhs * rhs - lhs
+    )
+  }
+
+  {
     given Arbitrary[Float] = Arbitrary.float.filter(f => !f.isInfinite && f > 2.03e31f)
     testFailure[Float, Float](
       "fail on float subtraction overflow",

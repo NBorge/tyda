@@ -40,6 +40,7 @@ import com.choreograph.tyda.sql.SqlDialect.TrimFunction
 import com.choreograph.tyda.sql.ast.DdlType
 import com.choreograph.tyda.sql.ast.DdlWriter
 import com.choreograph.tyda.sql.ast.From
+import com.choreograph.tyda.sql.ast.Identifier
 import com.choreograph.tyda.sql.ast.JoinType
 import com.choreograph.tyda.sql.ast.Query
 import com.choreograph.tyda.sql.ast.SqlExpr
@@ -382,6 +383,21 @@ private def exprToSqlExpr[T](fullExpr: ExprNode[T], args: UnparserArgs): Result[
             case _ => inner(elseExpr).map(Some(_))
           }
         } yield SqlExpr.Case(whensSql, elseSql)
+      case ExprNode.Let(value, reference, body) => for {
+          valueSql <- inner(value)
+          name = args.aliasGen.column()
+          bodySql <- exprToSqlExpr(body, args.withReferences(reference -> IdentifierOrSqlExpr.Expr(name)))
+        } yield dialect.expressionBinding match {
+          case SqlDialect.ExpressionBinding.WithExpression =>
+            SqlExpr.With(Seq((Identifier(name), valueSql)), bodySql)
+          case SqlDialect.ExpressionBinding.ArrayTransform(makeArray, transform, elementAt) =>
+            val array = SqlExpr.Function(makeArray, Seq(valueSql))
+            val lambda = SqlExpr.LambdaFunction(SqlExpr.Ident(name), bodySql)
+            SqlExpr.Function(
+              elementAt,
+              Seq(SqlExpr.Function(transform, Seq(array, lambda)), SqlExpr.LiteralNumeric("1"))
+            )
+        }
       case ExprNode.StartsWith(string, prefix) => for {
           str <- inner(string)
           pre <- inner(prefix)

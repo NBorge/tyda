@@ -121,36 +121,14 @@ private class ExprOnSpark[T](cfs: Map[ExprNode.Reference[?], ColumnFactory[?]]) 
   private def cfFromRef(ref: ExprNode.Reference[?]): ColumnFactory[?] =
     cfs.get(ref).getOrElse(Errors.failUnexpectedReference(ref, cfs.keys))
 
-  private def convertFloatingOperation[T](
-      floatingOperation: CheckFloatingOverflow.FloatingOperation[T]
-  )(using SparkSession): Column = {
-    val lhs = convert(floatingOperation.lhs)
-    val rhs = convert(floatingOperation.rhs)
-    val (checkedResult, returnedResult) = floatingOperation.operation match {
-      case ExprNode.Add(_, _, _) =>
-        val result = lhs + rhs
-        (result, result)
-      case ExprNode.Subtract(_, _, _) =>
-        val result = lhs - rhs
-        (result, result)
-      case ExprNode.Multiply(_, _, _) =>
-        val result = lhs * rhs.cast(catalystType(floatingOperation.operation.codec))
-        (result, result)
-      case ExprNode.Quotient(_, _, _) =>
-        val result = lhs / rhs
-        (result, result.cast(catalystType(floatingOperation.operation.codec)))
-      case result => unreachable(s"Unexpected floating overflow check for $result")
+  private def convertBoundFloatingOperation(expr: ExprNode[?])(using SparkSession): Column =
+    expr match {
+      case ExprNode.Add(_, lhs, rhs) => convert(lhs) + convert(rhs)
+      case ExprNode.Subtract(_, lhs, rhs) => convert(lhs) - convert(rhs)
+      case ExprNode.Multiply(_, lhs, rhs) => convert(lhs) * convert(rhs).cast(catalystType(expr.codec))
+      case ExprNode.Quotient(_, lhs, rhs) => (convert(lhs) / convert(rhs)).cast(catalystType(expr.codec))
+      case other => unreachable(s"Expected a bound floating operation, got $other")
     }
-    val lhsCf = ColumnFactory(lhs)(using floatingOperation.operation.codec)
-    val rhsCf = ColumnFactory(rhs)(using floatingOperation.operation.codec)
-    val resultCf = ColumnFactory(checkedResult)(using floatingOperation.operation.codec)
-    val overflowCfs = cfs + (floatingOperation.overflow.lhs -> lhsCf) +
-      (floatingOperation.overflow.rhs -> rhsCf) + (floatingOperation.overflow.result -> resultCf)
-    val overflow = new ExprOnSpark[T](overflowCfs).convert(floatingOperation.overflow.expr)
-    val error =
-      raise_error(lit(floatingOperation.errorMessage)).cast(catalystType(floatingOperation.operation.codec))
-    when(overflow, error).otherwise(returnedResult)
-  }
 
   private def buildHigherOrderArgs[T](seq: ExprNode[Seq[T]], compiled: CompiledExpr[T, ?])(using
       spark: SparkSession
@@ -265,6 +243,13 @@ private class ExprOnSpark[T](cfs: Map[ExprNode.Reference[?], ColumnFactory[?]]) 
           acc.when(convert(branch.whenExpr), convert(branch.thenExpr))
         )
         cases.otherwise(convert(elseExpr))
+      case ExprNode.Let(value, reference, body) =>
+        val valueColumn = body match {
+          case _: ExprNode.Cases[?] => convertBoundFloatingOperation(value)
+          case _ => convert(value)
+        }
+        val valueFactory = ColumnFactory(valueColumn)(using value.codec)
+        new ExprOnSpark[T](cfs + (reference -> valueFactory)).convert(body)
       case ExprNode.StartsWith(string, prefix) => startswith(convert(string), convert(prefix))
       case ExprNode.Trim(string) => trim(convert(string))
       case ExprNode.EndsWith(string, suffix) => endswith(convert(string), convert(suffix))
@@ -281,11 +266,10 @@ private class ExprOnSpark[T](cfs: Map[ExprNode.Reference[?], ColumnFactory[?]]) 
       case ExprNode.ToJson(inner) => to_json(convert(inner), jsonOptions)
       case ExprNode.FromJson(inner, codec) => from_json(convert(inner), catalystType(codec), jsonOptions)
       case ExprNode.SizeSeq(operand) => size(convert(operand))
+      case CheckFloatingOverflow.FloatAndDouble(checked) => convert(checked)
       case CheckArrayIndexPositive(array, index) =>
         val idx = convert(index)
         call_function("element_at", convert(array), idx + 1)
-      case CheckFloatingOverflow.FloatAndDouble(floatingOperation) =>
-        convertFloatingOperation(floatingOperation)
       case ExprNode.Abs(_, operand) => abs(convert(operand))
       case ExprNode.Add(_, lhs, rhs) => convert(lhs) + convert(rhs)
       case ExprNode.Subtract(_, lhs, rhs) => convert(lhs) - convert(rhs)
