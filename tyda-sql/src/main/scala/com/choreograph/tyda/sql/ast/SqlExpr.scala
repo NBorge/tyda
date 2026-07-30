@@ -6,6 +6,7 @@ private[sql] enum SqlExpr {
   case BinaryOp(op: String, lhs: SqlExpr, rhs: SqlExpr)
   case FieldAccess(struct: SqlExpr, field: Identifier)
   case Function(name: String, args: Seq[SqlExpr])
+  case OrderedAggregate(name: String, arg: SqlExpr, orderBy: SqlExpr, descending: Boolean, limit: Int)
   case Index(array: SqlExpr, index: SqlExpr)
   case Ident(name: Identifier)
   case LiteralString(value: String)
