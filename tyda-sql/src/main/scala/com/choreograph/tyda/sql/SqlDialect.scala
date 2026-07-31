@@ -31,7 +31,6 @@ final case class SqlDialect(
     binaryLiteral: SqlDialect.BinaryLiteral,
     boolAndFunction: String,
     boolOrFunction: String,
-    shortCircuitBooleanOperators: Boolean = false,
     bytesLength: String,
     fromBase64: SqlDialect.FromBase64Support,
     toBase64: SqlDialect.ToBase64Support.Function,
@@ -54,7 +53,6 @@ final case class SqlDialect(
     makeStruct: SqlDialect.MakeStruct,
     makeTimestamp: SqlDialect.MakeTimestamp,
     mapSupport: SqlDialect.MapSupport,
-    minMaxBy: SqlDialect.MinMaxBy = SqlDialect.MinMaxBy.Function("min_by", "max_by"),
     range: SqlDialect.Range,
     regexp: String,
     endsWithFunction: String,
@@ -221,11 +219,6 @@ object SqlDialect {
   enum MapSupport {
     case Array
     case Native(makeMap: String, mapEntries: String, mapGet: String, mapContains: String)
-  }
-
-  enum MinMaxBy {
-    case Function(min: String, max: String)
-    case OrderedArrayAgg(name: String)
   }
 
   enum IntegerSupport {
@@ -475,7 +468,6 @@ object SqlDialect {
     makeStruct = MakeStruct.FunctionAndAlias("struct"),
     makeTimestamp = MakeTimestamp.Function("timestamp_micros"),
     mapSupport = MapSupport.Array,
-    minMaxBy = MinMaxBy.Function("min_by", "max_by"),
     range = Range.Inclusive("generate_array", errorOnEmpty = false),
     regexp = "regexp_contains",
     endsWithFunction = "ends_with",
@@ -498,10 +490,8 @@ object SqlDialect {
     )
   )
 
-  val GoogleSql: SqlDialect = BigQuery.copy(
-    fromBase64 = FromBase64Support.StrictFunction("SAFE.FROM_BASE64", "regexp_replace", "regexp_contains"),
-    minMaxBy = MinMaxBy.OrderedArrayAgg("array_agg"),
-    shortCircuitBooleanOperators = true
+  val GoogleSql: SqlDialect = BigQuery.copy(fromBase64 =
+    FromBase64Support.StrictFunction("SAFE.FROM_BASE64", "regexp_replace", "regexp_contains")
   )
 
   private val sparkJsonOptions =
