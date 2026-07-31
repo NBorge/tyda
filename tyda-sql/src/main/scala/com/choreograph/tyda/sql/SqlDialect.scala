@@ -100,6 +100,8 @@ object SqlDialect {
       * `SAFE.FROM_BASE64(str)`.
       */
     case Function(name: String)
+
+    case StrictFunction(name: String, replace: String, matches: String)
   }
 
   /** How to encode binary to a Base64 string. */
@@ -496,8 +498,11 @@ object SqlDialect {
     )
   )
 
-  val GoogleSql: SqlDialect =
-    BigQuery.copy(minMaxBy = MinMaxBy.OrderedArrayAgg("array_agg"), shortCircuitBooleanOperators = true)
+  val GoogleSql: SqlDialect = BigQuery.copy(
+    fromBase64 = FromBase64Support.StrictFunction("SAFE.FROM_BASE64", "regexp_replace", "regexp_contains"),
+    minMaxBy = MinMaxBy.OrderedArrayAgg("array_agg"),
+    shortCircuitBooleanOperators = true
+  )
 
   private val sparkJsonOptions =
     Map("timeZone" -> "UTC", "timestampFormat" -> "yyyy-MM-dd'T'HH:mm[:ss][.SSSSSS][XXX]")

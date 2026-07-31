@@ -487,6 +487,29 @@ private def exprToSqlExpr[T](fullExpr: ExprNode[T], args: UnparserArgs): Result[
             case SqlDialect.FromBase64Support.TryFunction(name, format) =>
               SqlExpr.Function(name, Seq(str, SqlExpr.LiteralString(format)))
             case SqlDialect.FromBase64Support.Function(name) => SqlExpr.Function(name, Seq(str))
+            case SqlDialect.FromBase64Support.StrictFunction(name, replace, matches) =>
+              val withoutWhitespace = SqlExpr.Function(
+                replace,
+                Seq(
+                  str,
+                  SqlExpr.LiteralRawString(
+                    "[\\t-\\r\\x1C-\\x1F\\x{1680}\\x{2000}-\\x{2006}\\x{2008}-\\x{200A}\\x{2028}\\x{2029}\\x{205F}\\x{3000}]"
+                  ),
+                  SqlExpr.LiteralString("")
+                )
+              )
+              val isValid = SqlExpr.Function(
+                matches,
+                Seq(
+                  withoutWhitespace,
+                  SqlExpr.LiteralRawString(
+                    "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}(?:==)?|[A-Za-z0-9+/]{3}=?)?$"
+                  )
+                )
+              )
+              SqlExpr.Case(Seq(
+                (condition = isValid, result = SqlExpr.Function(name, Seq(withoutWhitespace)))
+              ))
           }
         )
       case ExprNode.ToBase64(binary) => inner(binary).map(bin =>

@@ -55,6 +55,10 @@ private[tyda] final case class SqlWriter(writer: Writer) {
           case c => writer.write(c)
         }
         writer.write('\'')
+      case SqlExpr.LiteralRawString(value) =>
+        writer.write("r'")
+        writer.write(value)
+        writer.write('\'')
       case SqlExpr.LiteralHexString(value) =>
         write("X'")
         value.foreach(b => write(f"$b%02x"))
