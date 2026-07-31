@@ -493,7 +493,7 @@ private def exprToSqlExpr[T](fullExpr: ExprNode[T], args: UnparserArgs): Result[
                 Seq(
                   str,
                   SqlExpr.LiteralRawString(
-                    "[\\t-\\r\\x1C-\\x1F\\x{1680}\\x{2000}-\\x{2006}\\x{2008}-\\x{200A}\\x{2028}\\x{2029}\\x{205F}\\x{3000}]"
+                    "[\\x20\\t-\\r\\x1C-\\x1F\\x{1680}\\x{2000}-\\x{2006}\\x{2008}-\\x{200A}\\x{2028}\\x{2029}\\x{205F}\\x{3000}]"
                   ),
                   SqlExpr.LiteralString("")
                 )
