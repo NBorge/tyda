@@ -54,6 +54,18 @@ SELECT t0.value AS _1, t1.value AS _2 FROM table1, unnest(table1._1) AS t0, unne
 SELECT t1 AS value FROM table1, unnest(table1.value) AS t0, unnest(t0.value) AS t1
 ------ end
 
+------ Test: explode to complex enum
+SELECT t0.discriminant AS discriminant, t0.a AS a, t0.b AS b FROM table1, unnest(table1.value) AS t0
+------ end
+
+------ Test: explode to product
+SELECT t0.a AS a, t0.b AS b FROM table1, unnest(table1.value) AS t0
+------ end
+
+------ Test: explode to simple enum
+SELECT t0.discriminant AS discriminant FROM table1, unnest(table1.value) AS t0
+------ end
+
 ------ Test: limit after aggregate
 SELECT table1._1 AS key, sum(table1._2) AS value FROM table1 GROUP BY table1._1 LIMIT 5
 ------ end
@@ -96,6 +108,10 @@ SELECT t0.value AS _1, table2.value AS _2 FROM (SELECT table1.value AS value FRO
 
 ------ Test: limit zero
 SELECT table1.value AS value FROM table1 LIMIT 0
+------ end
+
+------ Test: multiple explodes in separate selects
+SELECT t0 AS _1, t1 AS _2 FROM table1, unnest(table1.d) AS t0, unnest(table1.d) AS t1
 ------ end
 
 ------ Test: nested option upcast
@@ -172,6 +188,14 @@ SELECT CAST(1 AS INT) AS value FROM table1
 
 ------ Test: where
 SELECT table1.value AS value FROM table1 WHERE table1.value
+------ end
+
+------ Test: where after explode
+SELECT t0 AS _1, t1 AS _2, table1._1 AS _3 FROM table1, unnest(table1._2) AS t0, unnest(table1._2) AS t1 WHERE (t0 < CAST(0 AS INT))
+------ end
+
+------ Test: where before explode
+SELECT t0 AS _1, t1 AS _2, table1._1 AS _3 FROM table1, unnest(table1._2) AS t0, unnest(table1._2) AS t1 WHERE (array_length(table1._2) < CAST(2 AS INT))
 ------ end
 
 ------ Test: where literal
