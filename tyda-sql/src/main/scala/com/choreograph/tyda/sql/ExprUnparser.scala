@@ -490,13 +490,7 @@ private def exprToSqlExpr[T](fullExpr: ExprNode[T], args: UnparserArgs): Result[
             case SqlDialect.FromBase64Support.StrictFunction(name, replace, matches) =>
               val withoutWhitespace = SqlExpr.Function(
                 replace,
-                Seq(
-                  str,
-                  SqlExpr.LiteralRawString(
-                    "[\\x20\\t-\\r\\x1C-\\x1F\\x{1680}\\x{2000}-\\x{2006}\\x{2008}-\\x{200A}\\x{2028}\\x{2029}\\x{205F}\\x{3000}]"
-                  ),
-                  SqlExpr.LiteralString("")
-                )
+                Seq(str, SqlExpr.LiteralRawString("[\\x20\\t-\\r]"), SqlExpr.LiteralString(""))
               )
               val isValid = SqlExpr.Function(
                 matches,

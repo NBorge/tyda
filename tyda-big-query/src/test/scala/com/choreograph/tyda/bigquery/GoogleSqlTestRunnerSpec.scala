@@ -3,8 +3,11 @@ package com.choreograph.tyda.bigquery
 import com.github.plokhotnyuk.jsoniter_scala.core.readFromString
 import org.scalatest.funsuite.AnyFunSuite
 
+import com.choreograph.tyda.Binary
 import com.choreograph.tyda.Codec
+import com.choreograph.tyda.Dataset
 import com.choreograph.tyda.Decimal
+import com.choreograph.tyda.functions.fromBase64
 
 class GoogleSqlTestRunnerSpec extends AnyFunSuite {
   test("decode GoogleSQL JSON result rows") {
@@ -18,8 +21,8 @@ class GoogleSqlTestRunnerSpec extends AnyFunSuite {
 
   test("extract execution errors from GoogleSQL box output") {
     assert(
-      GoogleSqlTestRunner.errorMessageFromBoxOutput("ERROR: OUT_OF_RANGE: boom\n") ==
-        Some("OUT_OF_RANGE: boom")
+      GoogleSqlTestRunner.errorMessageFromBoxOutput("ERROR: OUT_OF_RANGE: value is out of range\n") ==
+        Some("OUT_OF_RANGE: value is out of range")
     )
   }
 
@@ -28,6 +31,12 @@ class GoogleSqlTestRunnerSpec extends AnyFunSuite {
       GoogleSqlTestRunner.escapeMacrosInStringLiterals("SELECT '$A(', '\\$B(', $parameter") ==
         "SELECT '$' 'A(', '\\$B(', $parameter"
     )
+  }
+
+  test("match BigQuery Base64 whitespace handling") {
+    val values = Seq("++ \t\r\n", "++\u001C", "++\u1680")
+    val result = GoogleSqlTestRunner.configuredOrSkip.collect(Dataset.from(values).select(fromBase64))
+    assert(result == Seq(Some(Binary.fromArray(Array(-5))), None, None))
   }
 
   test("decode nested arrays wrapped for GoogleSQL") {
