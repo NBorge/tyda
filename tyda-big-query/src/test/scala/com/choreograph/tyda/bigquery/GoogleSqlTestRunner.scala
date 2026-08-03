@@ -104,32 +104,39 @@ final class GoogleSqlTestRunner private (executable: Path) extends Runner {
   def explain(action: Dataset.Action): String = sql(action).single
 
   private def run(query: String): Seq[String] = {
-    val (exitCode, stdout, stderr) = runQuery(query, "json")
-    if exitCode != 0 then
-      throw RuntimeException(
-        s"GoogleSQL exited with status $exitCode. SQL:\n$query\nStandard output:\n$stdout\nStandard error:\n$stderr"
-      )
-    val output = stdout.trim
-    if output.isEmpty then {
-      val (boxExitCode, boxOutput, boxError) = runQuery(query, "box")
-      if boxExitCode != 0 then
+    val queryFile = Files.createTempFile("tyda-googlesql-", ".sql")
+    try {
+      Files.writeString(queryFile, query)
+      val (exitCode, stdout, stderr) = runQuery(queryFile, "json")
+      if exitCode != 0 then
         throw RuntimeException(
-          s"GoogleSQL exited with status $boxExitCode. SQL:\n$query\nStandard output:\n$boxOutput\nStandard error:\n$boxError"
+          s"GoogleSQL exited with status $exitCode. SQL:\n$query\nStandard output:\n$stdout\nStandard error:\n$stderr"
         )
-      GoogleSqlTestRunner
-        .errorMessageFromBoxOutput(boxOutput)
-        .foreach(message => throw RuntimeException(message))
-      return Seq.empty
-    }
-    try readFromString(output)(using GoogleSqlResultCodec)
-    catch {
-      case error: Throwable =>
-        throw RuntimeException(s"Unable to decode GoogleSQL result. SQL:\n$query\nOutput:\n$output", error)
-    }
+      val output = stdout.trim
+      if output.isEmpty then {
+        val (boxExitCode, boxOutput, boxError) = runQuery(queryFile, "box")
+        if boxExitCode != 0 then
+          throw RuntimeException(
+            s"GoogleSQL exited with status $boxExitCode. SQL:\n$query\nStandard output:\n$boxOutput\nStandard error:\n$boxError"
+          )
+        GoogleSqlTestRunner
+          .errorMessageFromBoxOutput(boxOutput)
+          .foreach(message => throw RuntimeException(message))
+        Seq.empty
+      } else
+        try readFromString(output)(using GoogleSqlResultCodec)
+        catch {
+          case error: Throwable => throw RuntimeException(
+              s"Unable to decode GoogleSQL result. SQL:\n$query\nOutput:\n$output",
+              error
+            )
+        }
+    } finally Files.deleteIfExists(queryFile): Unit
   }
 
-  private def runQuery(query: String, outputMode: String): (Int, String, String) = {
-    val command = Seq(executable.toString, "--catalog=none", s"--output_mode=$outputMode", query)
+  private def runQuery(queryFile: Path, outputMode: String): (Int, String, String) = {
+    val command =
+      Seq(executable.toString, "--catalog=none", s"--output_mode=$outputMode", s"--sql_file=$queryFile")
     val stdout = StringBuilder()
     val stderr = StringBuilder()
     val logger = ProcessLogger(
