@@ -21,8 +21,15 @@ class GoogleSqlTestRunnerSpec extends AnyFunSuite {
 
   test("extract execution errors from GoogleSQL box output") {
     assert(
-      GoogleSqlTestRunner.errorMessageFromBoxOutput("ERROR: OUT_OF_RANGE: value is out of range\n") ==
-        Some("OUT_OF_RANGE: value is out of range")
+      GoogleSqlTestRunner.errorMessageFromBoxOutput("ERROR: OUT_OF_RANGE: value is out of range\n", "", "") ==
+        "OUT_OF_RANGE: value is out of range"
+    )
+  }
+
+  test("report unexpected GoogleSQL box output") {
+    assert(
+      GoogleSqlTestRunner.errorMessageFromBoxOutput("", "SELECT 1", "unexpected output") ==
+        "GoogleSQL returned no JSON output and no recognized error. SQL:\nSELECT 1\nStandard output:\n\nStandard error:\nunexpected output"
     )
   }
 

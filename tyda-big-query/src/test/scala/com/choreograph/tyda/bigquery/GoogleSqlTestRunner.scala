@@ -46,10 +46,13 @@ object GoogleSqlTestRunner {
     }
   }
 
-  private[bigquery] def errorMessageFromBoxOutput(output: String): Option[String] =
+  private[bigquery] def errorMessageFromBoxOutput(output: String, query: String, stderr: String): String =
     output
       .linesIterator
       .collectFirst { case line if line.startsWith("ERROR: ") => line.stripPrefix("ERROR: ") }
+      .getOrElse(
+        s"GoogleSQL returned no JSON output and no recognized error. SQL:\n$query\nStandard output:\n$output\nStandard error:\n$stderr"
+      )
 
   private[bigquery] def escapeMacrosInStringLiterals(sql: String): String = {
     val result = StringBuilder()
@@ -119,10 +122,7 @@ final class GoogleSqlTestRunner private (executable: Path) extends Runner {
           throw RuntimeException(
             s"GoogleSQL exited with status $boxExitCode. SQL:\n$query\nStandard output:\n$boxOutput\nStandard error:\n$boxError"
           )
-        GoogleSqlTestRunner
-          .errorMessageFromBoxOutput(boxOutput)
-          .foreach(message => throw RuntimeException(message))
-        Seq.empty
+        throw RuntimeException(GoogleSqlTestRunner.errorMessageFromBoxOutput(boxOutput, query, boxError))
       } else
         try readFromString(output)(using GoogleSqlResultCodec)
         catch {
