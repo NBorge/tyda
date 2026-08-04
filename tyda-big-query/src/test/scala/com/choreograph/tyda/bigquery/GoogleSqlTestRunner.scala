@@ -1,6 +1,5 @@
 package com.choreograph.tyda.bigquery
 
-import java.math.MathContext
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -10,15 +9,15 @@ import scala.sys.process.ProcessLogger
 import com.github.plokhotnyuk.jsoniter_scala.core.JsonReader
 import com.github.plokhotnyuk.jsoniter_scala.core.JsonValueCodec
 import com.github.plokhotnyuk.jsoniter_scala.core.JsonWriter
+import com.github.plokhotnyuk.jsoniter_scala.core.readFromArrayReentrant
 import com.github.plokhotnyuk.jsoniter_scala.core.readFromString
+import com.github.plokhotnyuk.jsoniter_scala.core.writeToArrayReentrant
 import org.scalatest.Assertions.assume
 import org.scalatest.Assertions.pending
 
 import com.choreograph.tyda.Codec
 import com.choreograph.tyda.Dataset
-import com.choreograph.tyda.Decimal
 import com.choreograph.tyda.Field
-import com.choreograph.tyda.NumericLimits
 import com.choreograph.tyda.Runner
 import com.choreograph.tyda.json.CodecToJsoniter
 import com.choreograph.tyda.rewrite.CollectionOrNullableCollectionCodec
@@ -96,7 +95,7 @@ final class GoogleSqlTestRunner private (executable: Path) extends Runner {
       s"SELECT TO_JSON_STRING(result) AS value FROM ($rendered) AS result"
     )
     val encodedRows = run(query)
-    val jsonCodec = GoogleSqlJsonDecoder.create(using ds.codec)
+    val jsonCodec = GoogleSqlJsonCodec.create(using ds.codec)
     encodedRows.map(encoded => readFromString(encoded)(using jsonCodec))
   }
 
@@ -148,20 +147,15 @@ final class GoogleSqlTestRunner private (executable: Path) extends Runner {
   }
 }
 
-private[bigquery] object GoogleSqlJsonDecoder {
-  def create[T: Codec]: JsonValueCodec[T] =
-    Codec[T] match {
-      case Codec.Product(_, _, _) => fromReaderWriter[T]
-      case Codec.FromInjection(injection, inner) =>
-        xmap(create(using inner), injection.apply, injection.invert)
-      case _ => xmap(create[(value: T)], (value = _), _.value)
-    }
-
-  private def fromReaderWriter[T: Codec]: JsonValueCodec[T] = {
+private[bigquery] object GoogleSqlJsonCodec {
+  def create[T: Codec]: JsonValueCodec[T] = {
+    val codec = summon[Codec[T]]
     val jsonCodec = CodecToJsoniter.create[T]
-    val read = reader(summon[Codec[T]])
     new JsonValueCodec[T] {
-      def decodeValue(in: JsonReader, default: T): T = read(in)
+      def decodeValue(in: JsonReader, default: T): T = {
+        val tydaJson = GoogleSqlJsonNormalizer.normalize(in.readRawValAsBytes(), codec)
+        readFromArrayReentrant(tydaJson)(using jsonCodec)
+      }
 
       def encodeValue(value: T, out: JsonWriter): Unit = jsonCodec.encodeValue(value, out)
 
@@ -169,153 +163,134 @@ private[bigquery] object GoogleSqlJsonDecoder {
     }
   }
 
-  private def xmap[T: Codec, A](inner: JsonValueCodec[A], to: T => A, from: A => T): JsonValueCodec[T] =
-    new JsonValueCodec[T] {
-      def decodeValue(in: JsonReader, default: T): T = from(inner.decodeValue(in, inner.nullValue))
+}
 
-      def encodeValue(value: T, out: JsonWriter): Unit = inner.encodeValue(to(value), out)
+private object GoogleSqlJsonNormalizer {
+  private enum Json {
+    case Raw(value: scala.Array[Byte])
+    case JsonArray(values: Seq[Json])
+    case Object(fields: Seq[(String, Json)])
+  }
 
-      def nullValue: T = CodecToJsoniter.create[T].nullValue
-    }
+  private object JsonCodec extends JsonValueCodec[Json] {
+    def decodeValue(in: JsonReader, default: Json): Json = read(in)
 
-  private type Reader[T] = JsonReader => T
-
-  private def reader[T](codec: Codec[T]): Reader[T] =
-    codec match {
-      case Codec.Boolean => standardReader(Codec.Boolean)
-      case Codec.Byte => checkedIntegralReader[Byte]
-      case Codec.Short => checkedIntegralReader[Short]
-      case Codec.Int => checkedIntegralReader[Int]
-      case Codec.Long => standardReader(Codec.Long)
-      case Codec.Float => standardReader(Codec.Float)
-      case Codec.Double => standardReader(Codec.Double)
-      case Codec.String => standardReader(Codec.String)
-      case Codec.Bytes => standardReader(Codec.Bytes)
-      case decimal @ Codec.Decimal(precision, scale) => in => {
-          val value =
-            if in.nextValueIsString() then BigDecimal(in.readString(null))
-            else in.readBigDecimal(null, MathContext.UNLIMITED, 1000, 1000)
-          Decimal(using decimal.valid)(value).getOrElse(
-            throw RuntimeException(s"Value $value cannot be represented as Decimal($precision, $scale)")
-          )
-        }
-      case Codec.Date => standardReader(Codec.Date)
-      case Codec.TimestampMicros => standardReader(Codec.TimestampMicros)
-      case Codec.DurationMicros => standardReader(Codec.DurationMicros)
-      case Codec.Option(element @ Codec.Option(_)) => nestedOptionReader(element)
-      case Codec.Option(element) =>
-        val elementReader = reader(element)
-        in =>
-          if in.isNextToken('n') then in.readNullOrError(None, "expected null or value")
-          else {
-            in.rollbackToken()
-            Some(elementReader(in))
+    def encodeValue(value: Json, out: JsonWriter): Unit =
+      value match {
+        case Json.Raw(value) => out.writeRawVal(value)
+        case Json.JsonArray(values) =>
+          out.writeArrayStart()
+          values.foreach(encodeValue(_, out))
+          out.writeArrayEnd()
+        case Json.Object(fields) =>
+          out.writeObjectStart()
+          fields.foreach { case (name, value) =>
+            out.writeKey(name)
+            encodeValue(value, out)
           }
-      case Codec.Seq(element) =>
-        val elementReader = reader(element)
-        val wrapped = CollectionOrNullableCollectionCodec.unapply(element).isDefined
-        in => seqReader(in, if wrapped then wrappedReader(elementReader) else elementReader)
-      case Codec.Map(given Codec[k], given Codec[v]) =>
-        val pairReader = reader[Seq[(key: k, value: v)]](summon)
-        in => pairReader(in).map { case (key, value) => key -> value }.toMap
-      case product @ Codec.Product(_, _, _) => productReader(product)
-      case Codec.FromInjection(injection, inner) => reader(inner).andThen(injection.invert)
-    }
+          out.writeObjectEnd()
+      }
 
-  private def standardReader[T](codec: Codec[T]): Reader[T] = {
-    given Codec[T] = codec
-    val jsonCodec = CodecToJsoniter.unwrapped[T]
-    in => jsonCodec.decodeValue(in, jsonCodec.nullValue)
+    def nullValue: Json = Json.Raw("null".getBytes(java.nio.charset.StandardCharsets.UTF_8))
   }
 
-  private def checkedIntegralReader[A: {NumericLimits as limits, Numeric as numeric}]: Reader[A] =
-    in => {
-      import numeric.mkNumericOps
-      val value = if in.nextValueIsString() then in.readStringAsLong() else in.readLong()
-      if value < limits.min.toLong || value > limits.max.toLong then
-        throw RuntimeException(s"Value $value is out of range for target type")
-      numeric.fromInt(value.toInt)
-    }
-
-  private def nestedOptionReader[T](element: Codec.Option[T]): Reader[Option[Option[T]]] = {
-    given Codec[T] = element.element
-    val structReader = reader[Option[(value: Option[T])]](summon)
-    in => structReader(in).map(_.value)
+  def normalize(encoded: Array[Byte], codec: Codec[?]): Array[Byte] = {
+    val googleSqlJson = readFromArrayReentrant(encoded)(using JsonCodec)
+    val tydaJson = normalizeTopLevel(googleSqlJson, codec)
+    writeToArrayReentrant(tydaJson)(using JsonCodec)
   }
 
-  private def seqReader[T](in: JsonReader, elementReader: Reader[T]): Seq[T] =
-    if !in.isNextToken('[') then in.decodeError("Expected GoogleSQL array")
-    else if in.isNextToken(']') then Seq.empty
+  private def normalizeTopLevel(value: Json, codec: Codec[?]): Json =
+    codec match {
+      case Codec.Product(_, _, _) => normalize(value, codec)
+      case Codec.FromInjection(_, inner) => normalizeTopLevel(value, inner)
+      case _ => normalizeObject(value, Map("value" -> codec))
+    }
+
+  private def normalize(value: Json, codec: Codec[?]): Json =
+    codec match {
+      case Codec.Option(element @ Codec.Option(_)) => normalizeObject(value, Map("value" -> element))
+      case Codec.Option(element) => normalize(value, element)
+      case Codec.Seq(element) => normalizeArray(value, element)
+      case Codec.Map(keyCodec, valueCodec) => normalizeMap(value, keyCodec, valueCodec)
+      case Codec.Product(_, fields, _) =>
+        val fieldCodecs = fields
+          .mapConst[Field[?]]([t] => identity(_))
+          .map(field => field.name -> field.codec)
+          .toMap
+        normalizeObject(value, fieldCodecs)
+      case Codec.FromInjection(_, inner) => normalize(value, inner)
+      case _ => value
+    }
+
+  private def normalizeArray(value: Json, elementCodec: Codec[?]): Json =
+    value match {
+      case Json.JsonArray(values) =>
+        val wrapped = CollectionOrNullableCollectionCodec.unapply(elementCodec).isDefined
+        Json.JsonArray(values.map { value =>
+          val element = if wrapped then unwrapCollectionElement(value) else value
+          normalize(element, elementCodec)
+        })
+      case _ => value
+    }
+
+  private def normalizeMap(value: Json, keyCodec: Codec[?], valueCodec: Codec[?]): Json =
+    value match {
+      case Json.JsonArray(values) =>
+        Json.JsonArray(values.map(normalizeObject(_, Map("key" -> keyCodec, "value" -> valueCodec))))
+      case _ => value
+    }
+
+  private def unwrapCollectionElement(value: Json): Json =
+    value match {
+      case Json.Object(fields) => fields.collectFirst { case ("value", value) => value }.getOrElse(value)
+      case _ => value
+    }
+
+  private def normalizeObject(value: Json, fieldCodecs: Map[String, Codec[?]]): Json =
+    value match {
+      case Json.Object(fields) => Json.Object(fields.map { case (name, value) =>
+          name -> fieldCodecs.get(name).fold(value)(normalize(value, _))
+        })
+      case _ => value
+    }
+
+  private def read(in: JsonReader): Json =
+    if in.isNextToken('{') then readObject(in)
     else {
       in.rollbackToken()
-      val values = Vector.newBuilder[T]
+      if in.isNextToken('[') then readArray(in)
+      else {
+        in.rollbackToken()
+        Json.Raw(in.readRawValAsBytes())
+      }
+    }
+
+  private def readObject(in: JsonReader): Json = {
+    val fields = Vector.newBuilder[(String, Json)]
+    if !in.isNextToken('}') then {
+      in.rollbackToken()
       while {
-        values += elementReader(in)
+        fields += in.readKeyAsString() -> read(in)
+        in.isNextToken(',')
+      } do ()
+      if !in.isCurrentToken('}') then in.objectEndOrCommaError()
+    }
+    Json.Object(fields.result())
+  }
+
+  private def readArray(in: JsonReader): Json = {
+    val values = Vector.newBuilder[Json]
+    if !in.isNextToken(']') then {
+      in.rollbackToken()
+      while {
+        values += read(in)
         in.isNextToken(',')
       } do ()
       if !in.isCurrentToken(']') then in.arrayEndOrCommaError()
-      values.result()
     }
-
-  private def wrappedReader[T](read: Reader[T]): Reader[T] =
-    in => {
-      if !in.isNextToken('{') then in.decodeError("Expected GoogleSQL array element wrapper")
-      var value: Option[T] = None
-      if !in.isNextToken('}') then {
-        in.rollbackToken()
-        while {
-          in.readKeyAsString() match {
-            case "value" => value = Some(read(in))
-            case _ => in.skip()
-          }
-          in.isNextToken(',')
-        } do ()
-        if !in.isCurrentToken('}') then in.objectEndOrCommaError()
-      }
-      value.getOrElse(in.decodeError("GoogleSQL array element wrapper has no value field"))
-    }
-
-  private def productReader[T](codec: Codec.Product[T]): Reader[T] = {
-    val fields = codec.fields.mapConst[Field[?]]([t] => identity(_)).toArray
-    val readers = fields.map(_.codec).map(reader)
-    val required = fields.map(!_.codec.isInstanceOf[Codec.Option[?]])
-    val nameToIndex = fields.map(_.name).zipWithIndex.toMap
-    in =>
-      def fromValues(values: Array[Any]): T = {
-        required.foldLeft(0) { (index, isRequired) =>
-          if values(index) == null then
-            if isRequired then in.decodeError("missing required field " + fields(index).name)
-            else values(index) = None
-          index + 1
-        }: Unit
-        codec.fromProduct(Tuple.fromArray(values))
-      }
-      if !in.isNextToken('{') then in.decodeError("Expected GoogleSQL struct")
-      else if in.isNextToken('}') then fromValues(new Array[Any](fields.size))
-      else {
-        in.rollbackToken()
-        val values = new Array[Any](fields.size)
-        while {
-          val fieldName = in.readKeyAsString()
-          nameToIndex.get(fieldName) match {
-            case Some(index) =>
-              if values(index) != null then in.decodeError("duplicate key " + fieldName)
-              values(index) = readers(index)(in)
-            case _ => in.skip()
-          }
-          in.isNextToken(',')
-        } do ()
-        if !in.isCurrentToken('}') then in.objectEndOrCommaError()
-        fromValues(values)
-      }
+    Json.JsonArray(values.result())
   }
-
-  extension (in: JsonReader)
-    private def nextValueIsString(): Boolean = {
-      val result = in.isNextToken('"')
-      in.rollbackToken()
-      result
-    }
 }
 
 private[bigquery] object GoogleSqlResultCodec extends JsonValueCodec[Seq[String]] {

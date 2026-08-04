@@ -49,29 +49,44 @@ class GoogleSqlTestRunnerSpec extends AnyFunSuite {
   test("decode nested arrays wrapped for GoogleSQL") {
     given Codec[Seq[Seq[Int]]] = summon
     val encoded = """{"value":[{"value":[1,2]},{"value":[]}]}"""
-    assert(readFromString(encoded)(using GoogleSqlJsonDecoder.create) == Seq(Seq(1, 2), Seq.empty))
+    assert(readFromString(encoded)(using GoogleSqlJsonCodec.create) == Seq(Seq(1, 2), Seq.empty))
   }
 
   test("decode nullable arrays wrapped for GoogleSQL") {
     given Codec[Seq[Option[Seq[Int]]]] = summon
     val encoded = """{"value":[{"value":[1,2]},{"value":null},{"value":[]}]}"""
     assert(
-      readFromString(encoded)(using GoogleSqlJsonDecoder.create) ==
-        Seq(Some(Seq(1, 2)), None, Some(Seq.empty))
+      readFromString(encoded)(using GoogleSqlJsonCodec.create) == Seq(Some(Seq(1, 2)), None, Some(Seq.empty))
     )
   }
 
+  test("decode nested arrays wrapped inside maps for GoogleSQL") {
+    given Codec[Map[String, Seq[Seq[Int]]]] = summon
+    val encoded = """{"value":[{"key":"a","value":[{"value":[1,2]}]}]}"""
+    assert(readFromString(encoded)(using GoogleSqlJsonCodec.create) == Map("a" -> Seq(Seq(1, 2))))
+  }
+
+  test("decode nested arrays wrapped inside products for GoogleSQL") {
+    given Codec[(items: Seq[Seq[Int]])] = summon
+    val encoded = """{"items":[{"value":[1,2]},{"value":[]}]}"""
+    assert(readFromString(encoded)(using GoogleSqlJsonCodec.create) == (items = Seq(Seq(1, 2), Seq.empty)))
+  }
+
+  test("decode nested options containing arrays for GoogleSQL") {
+    given Codec[Option[Option[Seq[Seq[Int]]]]] = summon
+    val encoded = """{"value":{"value":[{"value":[1,2]}]}}"""
+    assert(readFromString(encoded)(using GoogleSqlJsonCodec.create) == Some(Some(Seq(Seq(1, 2)))))
+  }
+
   test("reject integral values outside the target type's range") {
-    val error = intercept[RuntimeException](readFromString("""{"value":2147483648}""")(using
-      GoogleSqlJsonDecoder.create[Int]
+    intercept[RuntimeException](readFromString("""{"value":2147483648}""")(using
+      GoogleSqlJsonCodec.create[Int]
     ))
-    assert(error.getMessage.contains("out of range"))
   }
 
   test("reject decimal values outside the target type's range") {
-    val error = intercept[RuntimeException](readFromString("""{"value":"100"}""")(using
-      GoogleSqlJsonDecoder.create[Decimal[2, 0]]
+    intercept[RuntimeException](readFromString("""{"value":"100"}""")(using
+      GoogleSqlJsonCodec.create[Decimal[2, 0]]
     ))
-    assert(error.getMessage.contains("cannot be represented as Decimal(2, 0)"))
   }
 }
