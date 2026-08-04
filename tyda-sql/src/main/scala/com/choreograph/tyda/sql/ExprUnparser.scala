@@ -220,7 +220,7 @@ private def exprToSqlExpr[T](fullExpr: ExprNode[T], args: UnparserArgs): Result[
             }
         }
       case ExprNode.LessThanOrEqual(_, lhs, rhs) => binaryOp("<=", lhs, rhs)
-      case ExprNode.And(lhs, rhs) if isGoogleSql(dialect) =>
+      case ExprNode.And(lhs, rhs) if dialect.useCaseForShortCircuitBooleanOperators =>
         for {
           lhsSql <- inner(lhs)
           rhsSql <- inner(rhs)
@@ -229,7 +229,7 @@ private def exprToSqlExpr[T](fullExpr: ExprNode[T], args: UnparserArgs): Result[
           elseExpr = Some(SqlExpr.LiteralBool(false))
         )
       case ExprNode.And(lhs, rhs) => binaryOp("AND", lhs, rhs)
-      case ExprNode.Or(lhs, rhs) if isGoogleSql(dialect) =>
+      case ExprNode.Or(lhs, rhs) if dialect.useCaseForShortCircuitBooleanOperators =>
         for {
           lhsSql <- inner(lhs)
           rhsSql <- inner(rhs)
@@ -948,8 +948,6 @@ object CompatibleFractional {
 private def simpleAggregate(name: String, arg: SqlExpr): Result[SqlExpr] =
   Right(SqlExpr.Function(name, Seq(arg)))
 
-private def isGoogleSql(dialect: SqlDialect): Boolean = dialect == SqlDialect.GoogleSql
-
 private def primitiveAggregate[T: Codec](
     arg: SqlExpr,
     agg: PrimitiveAggregate[T, ?],
@@ -980,12 +978,14 @@ private def primitiveAggregate[T: Codec](
       }
     case PrimitiveAggregate.Max(_) => simple("max")
     case PrimitiveAggregate.Min(_) => simple("min")
-    case PrimitiveAggregate.MaxBy(_) if isGoogleSql(dialect) =>
-      orderedArrayAgg(descending = true, "array_agg")
-    case PrimitiveAggregate.MaxBy(_) => binaryAgg("max_by")
-    case PrimitiveAggregate.MinBy(_) if isGoogleSql(dialect) =>
-      orderedArrayAgg(descending = false, "array_agg")
-    case PrimitiveAggregate.MinBy(_) => binaryAgg("min_by")
+    case PrimitiveAggregate.MaxBy(_) => dialect.minMaxBy match {
+        case SqlDialect.MinMaxBy.Function(_, max) => binaryAgg(max)
+        case SqlDialect.MinMaxBy.OrderedArrayAgg(name) => orderedArrayAgg(descending = true, name)
+      }
+    case PrimitiveAggregate.MinBy(_) => dialect.minMaxBy match {
+        case SqlDialect.MinMaxBy.Function(min, _) => binaryAgg(min)
+        case SqlDialect.MinMaxBy.OrderedArrayAgg(name) => orderedArrayAgg(descending = false, name)
+      }
     case PrimitiveAggregate.Sum(CompatibleSum()) => simple("sum")
     case PrimitiveAggregate.Sum(magnet) =>
       Left(DatasetToSqlError.RequiresUdfCapability(s"Sum uses custom $magnet"))
