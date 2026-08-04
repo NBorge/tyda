@@ -17,7 +17,8 @@ if [[ -x "$executable" ]] && echo "$sha256  $executable" | sha256sum --check --s
 fi
 
 mkdir -p "$(dirname "$executable")"
-readonly temporary_executable="$(mktemp "${executable}.download.XXXXXX")"
+temporary_executable="$(mktemp "${executable}.download.XXXXXX")"
+readonly temporary_executable
 trap 'rm -f "$temporary_executable"' EXIT
 
 curl --fail --location --retry 3 --output "$temporary_executable" "$download_url"
