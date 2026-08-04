@@ -191,11 +191,11 @@ SELECT table1.value AS value FROM table1 WHERE table1.value
 ------ end
 
 ------ Test: where after explode
-SELECT t0 AS _1, t1 AS _2, table1._1 AS _3 FROM table1, unnest(table1._2) AS t0, unnest(table1._2) AS t1 WHERE (t0 < CAST(0 AS INT))
+SELECT t0 AS _1, t1 AS _2, table1._1 AS _3 FROM table1, unnest(table1._2) AS t0, unnest(table1._2) AS t1 WHERE (t0 < CAST(0 AS INT64))
 ------ end
 
 ------ Test: where before explode
-SELECT t0 AS _1, t1 AS _2, table1._1 AS _3 FROM table1, unnest(table1._2) AS t0, unnest(table1._2) AS t1 WHERE (array_length(table1._2) < CAST(2 AS INT))
+SELECT t0 AS _1, t1 AS _2, table1._1 AS _3 FROM table1, unnest(table1._2) AS t0, unnest(table1._2) AS t1 WHERE (array_length(table1._2) < CAST(2 AS INT64))
 ------ end
 
 ------ Test: where literal
