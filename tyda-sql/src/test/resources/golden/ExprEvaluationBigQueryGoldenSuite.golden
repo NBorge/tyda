@@ -939,19 +939,19 @@ SELECT CAST(NULL AS BOOL) FROM t1
 ------ end
 
 ------ Test: make map
-SELECT CASE WHEN (array_length([struct(t1._1 AS _1, t1._2 AS _2)]) = array_length(array((SELECT c4.value FROM (SELECT c1 AS value, min(c2) AS c3 FROM unnest(array((SELECT c0._1 FROM unnest([struct(t1._1 AS _1, t1._2 AS _2)]) AS c0))) AS c1 WITH OFFSET AS c2 GROUP BY c1) AS c4 ORDER BY c4.c3)))) THEN CAST([struct(t1._1 AS _1, t1._2 AS _2)] AS ARRAY<STRUCT<key INT64,value STRING>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value STRING>>) END AS value FROM t1
+SELECT CASE WHEN (array_length([struct(t1._1 AS _1, t1._2 AS _2)]) = array_length(array((SELECT DISTINCT c1 FROM unnest(array((SELECT c0._1 FROM unnest([struct(t1._1 AS _1, t1._2 AS _2)]) AS c0))) AS c1)))) THEN CAST([struct(t1._1 AS _1, t1._2 AS _2)] AS ARRAY<STRUCT<key INT64,value STRING>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value STRING>>) END AS value FROM t1
 ------ end
 
 ------ Test: make map fails on duplicate keys
-SELECT CASE WHEN (array_length([struct(t1._1 AS _1, t1._2 AS _2), struct(t1._1 AS _1, 'duplicate' AS _2)]) = array_length(array((SELECT c4.value FROM (SELECT c1 AS value, min(c2) AS c3 FROM unnest(array((SELECT c0._1 FROM unnest([struct(t1._1 AS _1, t1._2 AS _2), struct(t1._1 AS _1, 'duplicate' AS _2)]) AS c0))) AS c1 WITH OFFSET AS c2 GROUP BY c1) AS c4 ORDER BY c4.c3)))) THEN CAST([struct(t1._1 AS _1, t1._2 AS _2), struct(t1._1 AS _1, 'duplicate' AS _2)] AS ARRAY<STRUCT<key INT64,value STRING>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value STRING>>) END AS value FROM t1
+SELECT CASE WHEN (array_length([struct(t1._1 AS _1, t1._2 AS _2), struct(t1._1 AS _1, 'duplicate' AS _2)]) = array_length(array((SELECT DISTINCT c1 FROM unnest(array((SELECT c0._1 FROM unnest([struct(t1._1 AS _1, t1._2 AS _2), struct(t1._1 AS _1, 'duplicate' AS _2)]) AS c0))) AS c1)))) THEN CAST([struct(t1._1 AS _1, t1._2 AS _2), struct(t1._1 AS _1, 'duplicate' AS _2)] AS ARRAY<STRUCT<key INT64,value STRING>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value STRING>>) END AS value FROM t1
 ------ end
 
 ------ Test: make map fails on literal duplicate keys
-SELECT CASE WHEN (array_length([struct(CAST(1 AS INT64) AS _1, t1.value AS _2), struct(CAST(1 AS INT64) AS _1, 'duplicate' AS _2)]) = array_length(array((SELECT c4.value FROM (SELECT c1 AS value, min(c2) AS c3 FROM unnest(array((SELECT c0._1 FROM unnest([struct(CAST(1 AS INT64) AS _1, t1.value AS _2), struct(CAST(1 AS INT64) AS _1, 'duplicate' AS _2)]) AS c0))) AS c1 WITH OFFSET AS c2 GROUP BY c1) AS c4 ORDER BY c4.c3)))) THEN CAST([struct(CAST(1 AS INT64) AS _1, t1.value AS _2), struct(CAST(1 AS INT64) AS _1, 'duplicate' AS _2)] AS ARRAY<STRUCT<key INT64,value STRING>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value STRING>>) END AS value FROM t1
+SELECT CASE WHEN (array_length([struct(CAST(1 AS INT64) AS _1, t1.value AS _2), struct(CAST(1 AS INT64) AS _1, 'duplicate' AS _2)]) = array_length(array((SELECT DISTINCT c1 FROM unnest(array((SELECT c0._1 FROM unnest([struct(CAST(1 AS INT64) AS _1, t1.value AS _2), struct(CAST(1 AS INT64) AS _1, 'duplicate' AS _2)]) AS c0))) AS c1)))) THEN CAST([struct(CAST(1 AS INT64) AS _1, t1.value AS _2), struct(CAST(1 AS INT64) AS _1, 'duplicate' AS _2)] AS ARRAY<STRUCT<key INT64,value STRING>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value STRING>>) END AS value FROM t1
 ------ end
 
 ------ Test: make map with a mix of literal and non-literal entries
-SELECT CASE WHEN (array_length([struct(t1._1 AS _1, 'a' AS _2), struct(CAST(2 AS INT64) AS _1, 'b' AS _2)]) = array_length(array((SELECT c4.value FROM (SELECT c1 AS value, min(c2) AS c3 FROM unnest(array((SELECT c0._1 FROM unnest([struct(t1._1 AS _1, 'a' AS _2), struct(CAST(2 AS INT64) AS _1, 'b' AS _2)]) AS c0))) AS c1 WITH OFFSET AS c2 GROUP BY c1) AS c4 ORDER BY c4.c3)))) THEN CAST([struct(t1._1 AS _1, 'a' AS _2), struct(CAST(2 AS INT64) AS _1, 'b' AS _2)] AS ARRAY<STRUCT<key INT64,value STRING>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value STRING>>) END AS value FROM t1
+SELECT CASE WHEN (array_length([struct(t1._1 AS _1, 'a' AS _2), struct(CAST(2 AS INT64) AS _1, 'b' AS _2)]) = array_length(array((SELECT DISTINCT c1 FROM unnest(array((SELECT c0._1 FROM unnest([struct(t1._1 AS _1, 'a' AS _2), struct(CAST(2 AS INT64) AS _1, 'b' AS _2)]) AS c0))) AS c1)))) THEN CAST([struct(t1._1 AS _1, 'a' AS _2), struct(CAST(2 AS INT64) AS _1, 'b' AS _2)] AS ARRAY<STRUCT<key INT64,value STRING>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value STRING>>) END AS value FROM t1
 ------ end
 
 ------ Test: make map with multiple entries
@@ -1043,7 +1043,7 @@ SELECT (SELECT c0.value FROM unnest(CAST([struct(CAST(1 AS INT64) AS _1, 'x' AS 
 ------ end
 
 ------ Test: mapGet with literal key
-SELECT (SELECT c5.value FROM unnest(CASE WHEN (array_length([struct(t1._1 AS _1, t1._2 AS _2)]) = array_length(array((SELECT c4.value FROM (SELECT c1 AS value, min(c2) AS c3 FROM unnest(array((SELECT c0._1 FROM unnest([struct(t1._1 AS _1, t1._2 AS _2)]) AS c0))) AS c1 WITH OFFSET AS c2 GROUP BY c1) AS c4 ORDER BY c4.c3)))) THEN CAST([struct(t1._1 AS _1, t1._2 AS _2)] AS ARRAY<STRUCT<key INT64,value STRING>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value STRING>>) END) AS c5 WHERE (c5.key = t1._1)) AS value FROM t1
+SELECT (SELECT c2.value FROM unnest(CASE WHEN (array_length([struct(t1._1 AS _1, t1._2 AS _2)]) = array_length(array((SELECT DISTINCT c1 FROM unnest(array((SELECT c0._1 FROM unnest([struct(t1._1 AS _1, t1._2 AS _2)]) AS c0))) AS c1)))) THEN CAST([struct(t1._1 AS _1, t1._2 AS _2)] AS ARRAY<STRUCT<key INT64,value STRING>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value STRING>>) END) AS c2 WHERE (c2.key = t1._1)) AS value FROM t1
 ------ end
 
 ------ Test: match-case all cases sealed trait
@@ -1399,7 +1399,7 @@ SELECT CAST([struct(CAST(1 AS INT64) AS _1, t1._1 AS _2), struct(CAST(2 AS INT64
 ------ end
 
 ------ Test: toMap with many
-SELECT CASE WHEN (array_length(array((SELECT c4.value FROM (SELECT c1 AS value, min(c2) AS c3 FROM unnest(array((SELECT struct(c0 AS _1, c0 AS _2) FROM unnest(t1.value) AS c0))) AS c1 WITH OFFSET AS c2 GROUP BY c1) AS c4 ORDER BY c4.c3))) = array_length(array((SELECT c14.value FROM (SELECT c11 AS value, min(c12) AS c13 FROM unnest(array((SELECT c10._1 FROM unnest(array((SELECT c9.value FROM (SELECT c6 AS value, min(c7) AS c8 FROM unnest(array((SELECT struct(c5 AS _1, c5 AS _2) FROM unnest(t1.value) AS c5))) AS c6 WITH OFFSET AS c7 GROUP BY c6) AS c9 ORDER BY c9.c8))) AS c10))) AS c11 WITH OFFSET AS c12 GROUP BY c11) AS c14 ORDER BY c14.c13)))) THEN CAST(array((SELECT c19.value FROM (SELECT c16 AS value, min(c17) AS c18 FROM unnest(array((SELECT struct(c15 AS _1, c15 AS _2) FROM unnest(t1.value) AS c15))) AS c16 WITH OFFSET AS c17 GROUP BY c16) AS c19 ORDER BY c19.c18)) AS ARRAY<STRUCT<key INT64,value INT64>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value INT64>>) END AS value FROM t1
+SELECT CASE WHEN (array_length(array((SELECT DISTINCT c1 FROM unnest(array((SELECT struct(c0 AS _1, c0 AS _2) FROM unnest(t1.value) AS c0))) AS c1))) = array_length(array((SELECT DISTINCT c5 FROM unnest(array((SELECT c4._1 FROM unnest(array((SELECT DISTINCT c3 FROM unnest(array((SELECT struct(c2 AS _1, c2 AS _2) FROM unnest(t1.value) AS c2))) AS c3))) AS c4))) AS c5)))) THEN CAST(array((SELECT DISTINCT c7 FROM unnest(array((SELECT struct(c6 AS _1, c6 AS _2) FROM unnest(t1.value) AS c6))) AS c7)) AS ARRAY<STRUCT<key INT64,value INT64>>) ELSE CAST(error('Duplicate keys found') AS ARRAY<STRUCT<key INT64,value INT64>>) END AS value FROM t1
 ------ end
 
 ------ Test: trim string

@@ -217,7 +217,9 @@ object SqlDialect {
       */
     case Subquery(makeArray: String, unnest: String)
 
-    /** Array distinct needs to preserve the first occurrence of each element using a subquery. */
+    /** Array distinct needs to preserve the first occurrence of each element
+      * using a subquery.
+      */
     case OrderedSubquery(makeArray: String, unnest: String)
   }
 
