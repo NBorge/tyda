@@ -31,6 +31,11 @@ trait DatasetBasicSuite extends DatasetSuite {
   test[MyEnum, MyEnum]("select enum", _.select(identity))
   test[Boolean, Map[Int, Int]]("select complex", _.select(_ => Map.empty[Int, Int]))
   test[Seq[SimpleProduct], SimpleProduct]("explode to product", _.select(explode(identity)))
+  test[Seq[SimpleProduct], Int]("select after explode to product", _.select(explode(identity)).select(_.a))
+  test[(Tuple1[Int], Seq[SimpleProduct]), Int](
+    "select different after explode to product",
+    _.select(_._1, explode(_._2)).select(_._1._1)
+  )
   test[Seq[SimpleEnum], SimpleEnum]("explode to simple enum", _.select(explode(identity)))
   test[Seq[MyEnum], MyEnum]("explode to complex enum", _.select(explode(identity)))
   test[(Seq[Int], Seq[Int]), (Int, Int)](
@@ -95,6 +100,7 @@ trait DatasetBasicSuite extends DatasetSuite {
   test[TinyByte, TinyByte]("distinct primitive", _.distinct)
   test[Option[TinyByte], Option[TinyByte]]("distinct Option", _.distinct)
   test[List[TinyByte], List[TinyByte]]("distinct List", _.distinct)
+  test[(a: Boolean, b: Boolean), Boolean]("distinct before select", _.distinct.select(_.a))
 
   test[Int, Int, Int]("union", (left, right) => left.union(right))
   test[(Int, Int), (Int, Int), (Int, Int)]("union on struct", (left, right) => left.union(right))
