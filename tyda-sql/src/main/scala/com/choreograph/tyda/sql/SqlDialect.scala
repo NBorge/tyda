@@ -216,6 +216,9 @@ object SqlDialect {
       * ```
       */
     case Subquery(makeArray: String, unnest: String)
+
+    /** Array distinct needs to preserve the first occurrence of each element using a subquery. */
+    case OrderedSubquery(makeArray: String, unnest: String)
   }
 
   enum MapSupport {
@@ -500,6 +503,7 @@ object SqlDialect {
   )
 
   val GoogleSql: SqlDialect = BigQuery.copy(
+    arrayDistinct = ArrayDistinct.OrderedSubquery("array", "unnest"),
     fromBase64 = FromBase64Support.StrictFunction("SAFE.FROM_BASE64", "regexp_replace", "regexp_contains"),
     minMaxBy = MinMaxBy.OrderedArrayAgg("array_agg"),
     useCaseForShortCircuitBooleanOperators = true

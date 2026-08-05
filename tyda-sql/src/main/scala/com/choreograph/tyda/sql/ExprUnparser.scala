@@ -454,6 +454,17 @@ private def exprToSqlExpr[T](fullExpr: ExprNode[T], args: UnparserArgs): Result[
             case SqlDialect.ArrayDistinct.Function(name) => SqlExpr.Function(name, Seq(arr))
             case SqlDialect.ArrayDistinct.Subquery(makeArray, unnest) =>
               val element = args.aliasGen.column()
+              val selectQuery = Query.Select(
+                select = NonEmpty(SqlExpr.Ident(element)),
+                from = Some(From.Expr(SqlExpr.Function(unnest, Seq(arr)), element)),
+                where = None,
+                groupBy = Seq.empty,
+                having = None,
+                distinct = true
+              )
+              SqlExpr.Function(makeArray, Seq(SqlExpr.Subquery(selectQuery)))
+            case SqlDialect.ArrayDistinct.OrderedSubquery(makeArray, unnest) =>
+              val element = args.aliasGen.column()
               val offset = args.aliasGen.column()
               val firstOffset = args.aliasGen.column()
               val subqueryAlias = args.aliasGen.column()

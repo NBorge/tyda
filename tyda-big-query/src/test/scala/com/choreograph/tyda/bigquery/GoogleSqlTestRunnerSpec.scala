@@ -46,6 +46,13 @@ class GoogleSqlTestRunnerSpec extends AnyFunSuite {
     assert(result == Seq(Some(Binary.fromArray(Array(-5))), None, None))
   }
 
+  test("preserve first-occurrence order when distincting sequences") {
+    val result = GoogleSqlTestRunner
+      .configuredOrSkip
+      .collect(Dataset.from(Seq(Seq(3, 1, 3, 2, 1))).select(_.distinct))
+    assert(result == Seq(Seq(3, 1, 2)))
+  }
+
   test("decode nested arrays wrapped for GoogleSQL") {
     given Codec[Seq[Seq[Int]]] = summon
     val encoded = """{"value":[{"value":[1,2]},{"value":[]}]}"""

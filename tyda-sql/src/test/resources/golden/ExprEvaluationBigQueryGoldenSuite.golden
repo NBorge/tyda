@@ -659,7 +659,7 @@ SELECT FALSE AS value FROM t1
 ------ end
 
 ------ Test: distinct on Seq[Int]
-SELECT array((SELECT c3.value FROM (SELECT c0 AS value, min(c1) AS c2 FROM unnest(t1.value) AS c0 WITH OFFSET AS c1 GROUP BY c0) AS c3 ORDER BY c3.c2)) AS value FROM t1
+SELECT array((SELECT DISTINCT c0 FROM unnest(t1.value) AS c0)) AS value FROM t1
 ------ end
 
 ------ Test: endsWith string
