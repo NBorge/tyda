@@ -183,6 +183,8 @@ trait ExprEvaluationSuiteBase extends AnyFunSuite {
   testEqualsAndContains[Option[Boolean]]
   testEqualsAndContains[Option[Option[Boolean]]]
   testEqualsAndContains[Seq[Boolean]]
+  testEqualsAndContains[Option[Seq[Boolean]]]
+  testEqualsAndContains[Seq[Option[Boolean]]]
   testEqualsAndContains[Seq[Struct]]
   testEqualsAndContains[Seq[WithOptionField]]
   testEqualsAndContains[Seq[Seq[Boolean]]]
@@ -1050,6 +1052,12 @@ trait ExprEvaluationSuiteBase extends AnyFunSuite {
     _ == true
   )
 
+  testHasSameBehavior[TestEnum, Boolean](
+    "compare to literal enum variant",
+    _ == lit(TestEnum.B),
+    _ == TestEnum.B
+  )
+
   val specialStrings = Seq("\b", "\f", "\n", "\r", "\t", "\u000B", "'", "\\", "\"", "`", "${var}")
   testHasSameBehavior[Int, Seq[String]](
     "handle special strings",
@@ -1254,6 +1262,7 @@ trait ExprEvaluationSuiteBase extends AnyFunSuite {
   testLiteralCreation[Option[Struct]](None)
   testLiteralCreation[Option[Struct]](Some(Struct(1, "a", false)))
   testLiteralCreation[TestEnum](TestEnum.A)
+  testLiteralCreation[TestEnum](TestEnum.C(1))
   testLiteralCreation[Option[TestEnum]](None)
   testLiteralCreation[Option[TestEnum.A.type]](None)
   testLiteralCreation[Option[TestEnum]](Some(TestEnum.C(1)))

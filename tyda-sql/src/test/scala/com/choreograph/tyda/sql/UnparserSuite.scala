@@ -86,8 +86,6 @@ abstract class UnparserSuite extends SqlGoldenTestSuite {
 
   testSql("fromSeq") { Dataset.FromSeq(Seq(1, 2, 3)) }
 
-  testSql("literal enum") { Dataset.FromSeq(Seq(E1.A(1)).map(Tuple1(_))).select(_._1 == E1.C) }
-
   testSql("literal singleton") { Dataset.FromSeq[E1.C.type](Seq(E1.C)) }
 
   testSql("literal enum as string") { Dataset.FromSeq(Seq(E2.First)).select(_ == E2.Second) }
