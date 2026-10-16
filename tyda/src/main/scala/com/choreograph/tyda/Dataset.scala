@@ -564,6 +564,9 @@ sealed trait Dataset[T: Codec] {
   def writeToPath(path: String, format: Format): Action =
     Action.Write(this, if path.endsWith("/") then path else path + "/", format)
 
+  def writeToTable(identifier: String, location: TableLocation): Action =
+    Action.WriteTable(this, identifier, location)
+
   /** Returns an expression that evaluates to true if the dataset contains at
     * least one row, false otherwise. This can be used in subquery expressions.
     *
@@ -589,6 +592,8 @@ object Dataset {
   sealed trait Action
   private[tyda] object Action {
     final case class Write[T](input: Dataset[T], path: String, format: Format) extends Action
+    final case class WriteTable[T](input: Dataset[T], identifier: String, location: TableLocation)
+        extends Action
 
     private val datasetApi = {
       import ExprNode.DatasetLeafs.given

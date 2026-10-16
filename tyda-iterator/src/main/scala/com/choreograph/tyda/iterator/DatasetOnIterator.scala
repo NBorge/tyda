@@ -37,6 +37,8 @@ object DatasetOnIterator {
     ds match {
       case Dataset.Action.Write(input, path, Format.Parquet) => writeParquetToPath(input, path, input.codec)
       case Dataset.Action.Write(input, path, Format.Json) => writeJsonToPath(input, path, input.codec)
+      case Dataset.Action.WriteTable(_, _, _) =>
+        throw new UnsupportedOperationException("WriteTable is not supported by IteratorRunner")
     }
 
   def apply[T](ds: Dataset[T]): Iterator[T] =

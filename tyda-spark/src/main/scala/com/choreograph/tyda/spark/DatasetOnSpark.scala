@@ -133,6 +133,8 @@ object DatasetOnSpark {
     action match {
       case SparkJsonCompatability.ConvertWrites(converted) => perform(converted)
       case Dataset.Action.Write(input, path, format) => write(DatasetOnSpark(input), format, path)
+      case Dataset.Action.WriteTable(_, _, _) =>
+        throw new UnsupportedOperationException("WriteTable is not supported by SparkRunner")
     }
 
   def apply[T](ds: Dataset[T])(using spark: SparkSession): SparkDataset[T] = {

@@ -83,6 +83,8 @@ def toSql(action: Dataset.Action, dialect: SqlDialect): Result[RenderedMultiStat
           }
         }
         .map(queryToString)
+    case Dataset.Action.WriteTable(_, _, _) =>
+      throw new UnsupportedOperationException("WriteTable is not supported by BigQueryRunner")
   }
 }
 

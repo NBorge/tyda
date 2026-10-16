@@ -64,6 +64,7 @@ private def children[T](ds: Dataset[T] | Dataset.Action): Seq[Dataset[?]] =
     case Dataset.SelectN(input, _) => Seq(input)
     case Dataset.Union(left, right) => Seq(left, right)
     case Dataset.Action.Write(input, _, _) => Seq(input)
+    case Dataset.Action.WriteTable(input, _, _) => Seq(input)
     case Dataset.Limit(input, _) => Seq(input)
     case Dataset.OrderBy(input, _) => Seq(input)
   }
@@ -94,6 +95,7 @@ private def exprs[T](ds: Dataset[T] | Dataset.Action): Seq[AnyCompiledExpr] =
     case Dataset.SelectN(_, exprs) => tupleInstances(exprs).mapConst([t] => identity(_))
     case Dataset.Union(_, _) => Seq.empty
     case Dataset.Action.Write(_, _, _) => Seq.empty
+    case Dataset.Action.WriteTable(_, _, _) => Seq.empty
     case Dataset.Limit(_, _) => Seq.empty
     case Dataset.OrderBy(_, key) => Seq(key)
   }
