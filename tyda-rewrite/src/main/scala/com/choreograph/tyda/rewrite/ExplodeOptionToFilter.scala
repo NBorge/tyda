@@ -5,6 +5,7 @@ import com.choreograph.tyda.CompiledExpr
 import com.choreograph.tyda.Dataset
 import com.choreograph.tyda.ExprNode
 import com.choreograph.tyda.TreeApi.Continue
+import com.choreograph.tyda.TreeApi.Skip
 
 object ExplodeOptionToFilter extends DatasetRule {
 
@@ -16,6 +17,8 @@ object ExplodeOptionToFilter extends DatasetRule {
           .transformAccumulateDown(None: Option[ExprNode[Boolean]])([t] =>
             (acc, node) =>
               node match {
+                case subquery @ (ExprNode.ScalarSubquery(_) | ExprNode.ExistsSubquery(_)) =>
+                  Skip(acc, subquery)
                 case ExprNode.Explode(ExprNode.OptionToIterable(e)) =>
                   Continue(Some(acc.fold(!e.isEmpty)(_ && !e.isEmpty)), ExprNode.KnownNotNull(e))
                 case _ => Continue(acc, node)
